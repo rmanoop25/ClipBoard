@@ -1,0 +1,5 @@
+# Compiled binary
+ClipBoard.app/Contents/MacOS/ClipBoard
+
+# macOS
+.DS_Store
