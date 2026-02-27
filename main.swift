@@ -957,14 +957,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let clearItem = NSMenuItem(title: "Clear Unpinned", action: #selector(clearHistory), keyEquivalent: "K")
         clearItem.keyEquivalentModifierMask = [.command, .shift]
         clearItem.target = self; clearItem.isEnabled = !unpinnedItems.isEmpty
+        clearItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
+        clearItem.image?.size = NSSize(width: 14, height: 14); clearItem.image?.isTemplate = true
         menu.addItem(clearItem)
 
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.keyEquivalentModifierMask = .command; settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        settingsItem.image?.size = NSSize(width: 14, height: 14); settingsItem.image?.isTemplate = true
         menu.addItem(settingsItem)
 
+        menu.addItem(NSMenuItem.separator())
+
         let quit = NSMenuItem(title: "Quit ClipBoard", action: #selector(quitApp), keyEquivalent: "q")
-        quit.target = self; menu.addItem(quit)
+        quit.keyEquivalentModifierMask = .command; quit.target = self
+        quit.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+        quit.image?.size = NSSize(width: 14, height: 14); quit.image?.isTemplate = true
+        menu.addItem(quit)
 
         statusItem.menu = menu
     }
