@@ -5,12 +5,16 @@ A lightweight macOS menu bar clipboard history manager. Single-file Swift app, n
 ## Features
 
 - **Menu bar app** -- lives in the top bar, no Dock icon
-- **Last 10 clipboard items** -- automatically captures text copies
+- **Configurable history size** -- keep 5 to 50 clipboard items (default 10)
 - **Quick paste popup** (`Cmd+Shift+V`) -- floating suggestion panel at your cursor, auto-pastes into the active text field
 - **Pin items** -- pinned items stay at the top and are never removed
 - **Keyboard driven** -- navigate, select, and pin without touching the mouse
+- **Settings window** (`Cmd+,`) -- configure history size, shortcut, launch at login
+- **Custom shortcut** -- re-record the quick paste hotkey to any combo you prefer
+- **Launch at login** -- optional, toggle in settings
 - **Persists pins** -- pinned items survive app restarts
 - **Deduplication** -- copying the same text moves it to the top instead of creating duplicates
+- **Custom app icon** -- programmatically generated, no external assets
 - **Native macOS UI** -- vibrancy, SF Symbols, system colors, dark mode support
 
 ## Install
@@ -60,16 +64,27 @@ Pin any item to keep it permanently at the top of the list. Pinned items are nev
 - **Popup**: select an item and press `Cmd+P`
 - **Menu bar**: hover an item > submenu > Pin/Unpin
 
+### Settings
+
+Open with `Cmd+,` from the menu bar dropdown or click "Settings..." in the menu.
+
+- **History size** -- adjust from 5 to 50 items
+- **Launch at login** -- start ClipBoard when you log in
+- **Enable popup** -- toggle the quick paste popup on/off
+- **Quick paste shortcut** -- click the shortcut button and press a new key combo to re-bind
+
 ## Project structure
 
 ```
 ClipBoard/
-  main.swift              Single-file source (~860 lines)
-  build.sh                Build script
+  main.swift              Single-file source
+  generate_icon.swift     Programmatic app icon generator
+  build.sh                Build script (compiles + generates icon)
   ClipBoard.app/          Ready-to-run app bundle
     Contents/
-      Info.plist           App metadata (LSUIElement, bundle ID)
+      Info.plist           App metadata (LSUIElement, bundle ID, icon)
       MacOS/ClipBoard      Compiled binary
+      Resources/AppIcon.icns  App icon
 ```
 
 ## How it works
@@ -79,6 +94,9 @@ ClipBoard/
 - **Suggestion panel**: borderless `NSPanel` with `NSVisualEffectView` (.popover material) and `NSTableView`
 - **Auto-paste**: `CGEvent` posts a synthetic `Cmd+V` keystroke to the previously focused app
 - **Pin persistence**: pinned item contents saved as JSON array to `~/Library/Application Support/ClipBoard/pinned.json`
+- **Settings**: stored in `UserDefaults` (standard macOS preferences system)
+- **Launch at login**: uses `SMAppService` (macOS 13+)
+- **App icon**: generated programmatically by `generate_icon.swift` using `NSBitmapImageRep`, converted to `.icns` via `iconutil`
 
 ## Data storage
 

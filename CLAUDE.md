@@ -7,7 +7,7 @@ ClipBoard is a native macOS menu bar clipboard history app written in a single S
 ## Build
 
 ```bash
-swiftc main.swift -o ClipBoard.app/Contents/MacOS/ClipBoard -framework Cocoa -framework Carbon -O
+swiftc main.swift -o ClipBoard.app/Contents/MacOS/ClipBoard -framework Cocoa -framework Carbon -framework ServiceManagement -O
 ```
 
 Or use the build script:
@@ -22,18 +22,23 @@ There is no Xcode project or Swift Package. The app is a single `main.swift` com
 
 Everything lives in `main.swift`. Key components:
 
+- **`Settings`** (singleton) -- wraps `UserDefaults` for max items, hotkey key code/modifiers, popup enabled, launch at login. Launch at login uses `SMAppService`.
 - **`ClipboardItem`** (class) -- model holding content, timestamp, and pin state
 - **`ClipboardMonitor`** -- polls `NSPasteboard` every 0.5s, manages history list (pinned first, then unpinned by recency), handles pin persistence to `~/Library/Application Support/ClipBoard/pinned.json`
 - **`SuggestionPanel`** -- `NSPanel` subclass that overrides `canBecomeKey` for keyboard input
 - **`SuggestionRowView`** -- custom `NSTableRowView` with rounded selection highlight
 - **`SuggestionWindowController`** -- manages the floating popup: `NSTableView` inside `NSVisualEffectView`, local key event monitor for navigation/selection/pinning
-- **`AppDelegate`** -- owns the `NSStatusItem`, `ClipboardMonitor`, suggestion window controller. Registers the global `Cmd+Shift+V` hotkey via Carbon `RegisterEventHotKey`. Handles paste simulation via `CGEvent`.
+- **`ShortcutRecorderButton`** -- `NSButton` subclass that captures key combos. Click to enter recording mode, press a modifier+key combo to save, Escape to cancel.
+- **`SettingsWindowController`** -- preferences window with history size stepper, launch at login checkbox, popup enable checkbox, and shortcut recorder
+- **`AppDelegate`** -- owns the `NSStatusItem`, `ClipboardMonitor`, suggestion window controller, settings window controller. Registers global hotkey via Carbon `RegisterEventHotKey` (re-registers on shortcut change). Handles paste simulation via `CGEvent`.
 - **Entry point** -- creates `NSApplication`, sets delegate, calls `app.run()` (no storyboards/nibs)
+
+`generate_icon.swift` is a standalone script that draws the app icon using `NSBitmapImageRep` + Core Graphics at all required sizes, outputs an `.iconset` directory, which `build.sh` converts to `.icns` via `iconutil`.
 
 ## Key conventions
 
 - **Single file**: all code stays in `main.swift`. Do not split into multiple files.
-- **No dependencies**: only system frameworks (Cocoa, Carbon). No SPM, CocoaPods, or third-party libraries.
+- **No dependencies**: only system frameworks (Cocoa, Carbon, ServiceManagement). No SPM, CocoaPods, or third-party libraries.
 - **No Xcode project**: compiled directly with `swiftc`. The `.app` bundle is manually structured.
 - **LSUIElement**: set to `true` in `Info.plist` so the app has no Dock icon.
 - **SF Symbols**: used for all icons (clipboard, pin.fill). No custom image assets.
@@ -42,12 +47,13 @@ Everything lives in `main.swift`. Key components:
 ## Data
 
 - Pinned items persist to `~/Library/Application Support/ClipBoard/pinned.json` as a JSON string array.
+- Settings persist via `UserDefaults` (standard `~/Library/Preferences/com.anoop.clipboard.plist`).
 - Unpinned history is in-memory only and lost on quit.
-- Max 10 unpinned items. Pinned items have no limit.
+- Max unpinned items configurable (5-50, default 10). Pinned items have no limit.
 
 ## Global hotkey
 
-The `Cmd+Shift+V` hotkey is registered via Carbon's `RegisterEventHotKey` (not `NSEvent.addGlobalMonitorForEvents`) because it works without accessibility permissions for the hotkey itself. The paste simulation (`CGEvent` posting) does require accessibility access.
+The hotkey (default `Cmd+Shift+V`) is registered via Carbon's `RegisterEventHotKey` (not `NSEvent.addGlobalMonitorForEvents`) because it works without accessibility permissions for the hotkey itself. The paste simulation (`CGEvent` posting) does require accessibility access. When the user changes the shortcut in settings, the old hotkey is unregistered with `UnregisterEventHotKey` and a new one is registered.
 
 ## Testing
 

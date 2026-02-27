@@ -1,5 +1,9 @@
 # Compiled binary
 ClipBoard.app/Contents/MacOS/ClipBoard
 
+# Generated icon (rebuild with ./build.sh)
+ClipBoard.app/Contents/Resources/AppIcon.icns
+AppIcon.iconset/
+
 # macOS
 .DS_Store
