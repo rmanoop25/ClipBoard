@@ -35,7 +35,16 @@ open ClipBoard.app
 
 - macOS 13+
 - Xcode Command Line Tools (`xcode-select --install`)
-- **Accessibility permission** -- required for the `Cmd+Shift+V` auto-paste feature. macOS will prompt on first launch. Grant it in System Settings > Privacy & Security > Accessibility.
+
+### Permissions
+
+ClipBoard requires **Accessibility** permission to simulate `Cmd+V` paste into the active app. Without it, selecting an item will copy it to the clipboard but not auto-paste.
+
+1. On first launch, macOS will prompt you to grant Accessibility access
+2. If the prompt doesn't appear, or auto-paste isn't working, go to **System Settings → Privacy & Security → Accessibility** and add ClipBoard
+3. Make sure the toggle next to ClipBoard is **ON**
+
+> **After rebuilding:** Each build produces a new unsigned binary, which invalidates the previous Accessibility grant. You must **remove and re-add** ClipBoard in the Accessibility list after every rebuild, or toggle it off and on again.
 
 ## Usage
 
@@ -92,7 +101,7 @@ ClipBoard/
 - **Clipboard monitoring**: a 0.5s `Timer` polls `NSPasteboard.general.changeCount` for changes
 - **Global hotkey**: Carbon `RegisterEventHotKey` registers `Cmd+Shift+V` system-wide
 - **Suggestion panel**: borderless `NSPanel` with `NSVisualEffectView` (.popover material) and `NSTableView`
-- **Auto-paste**: `CGEvent` posts a synthetic `Cmd+V` keystroke to the previously focused app
+- **Auto-paste**: uses AppleScript `System Events` keystroke (with CGEvent fallback) to simulate `Cmd+V` in the previously focused app. Waits for modifier keys to be released before pasting to avoid hotkey interference
 - **Pin persistence**: pinned item contents saved as JSON array to `~/Library/Application Support/ClipBoard/pinned.json`
 - **Settings**: stored in `UserDefaults` (standard macOS preferences system)
 - **Launch at login**: uses `SMAppService` (macOS 13+)

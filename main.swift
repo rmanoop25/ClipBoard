@@ -785,6 +785,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var isAccessibilityTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
     // MARK: - Global Hotkey
 
     func registerGlobalHotKey() {
@@ -863,17 +867,70 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleSuggestionSelect(_ item: ClipboardItem) {
         monitor.copyToClipboard(item)
-        dismissSuggestionPanel()
         rebuildMenu()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.simulatePaste() }
+        dismissSuggestionPanel()
+        waitForModifiersReleasedThenPaste()
+    }
+
+    private func waitForModifiersReleasedThenPaste() {
+        DispatchQueue.global(qos: .userInteractive).async {
+            // Wait up to 2s for user to release modifier keys from the hotkey
+            for _ in 0..<200 {
+                let flags = CGEventSource.flagsState(.hidSystemState)
+                let modifierBits = flags.rawValue & 0x00FF_0000
+                if modifierBits == 0 { break }
+                usleep(10_000) // 10ms
+            }
+            // Small extra delay to let the target app fully activate
+            usleep(50_000) // 50ms
+            DispatchQueue.main.async { [weak self] in
+                self?.simulatePaste()
+            }
+        }
     }
 
     private func simulatePaste() {
-        let source = CGEventSource(stateID: .combinedSessionState)
+        // Try AppleScript approach — works reliably with Accessibility permission
+        let script = NSAppleScript(source: """
+            tell application "System Events"
+                keystroke "v" using command down
+            end tell
+            """)
+        var error: NSDictionary?
+        script?.executeAndReturnError(&error)
+        if let error = error {
+            NSLog("ClipBoard: AppleScript paste failed: \(error)")
+            // Fallback to CGEvent
+            simulatePasteCGEvent()
+        }
+    }
+
+    private func simulatePasteCGEvent() {
+        guard isAccessibilityTrusted else {
+            NSLog("ClipBoard: Accessibility not granted, cannot simulate paste")
+            DispatchQueue.main.async { [weak self] in self?.showAccessibilityAlert() }
+            return
+        }
+        let source = CGEventSource(stateID: .hidSystemState)
         let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true)
-        down?.flags = .maskCommand; down?.post(tap: .cghidEventTap)
         let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
-        up?.flags = .maskCommand; up?.post(tap: .cghidEventTap)
+        down?.flags = .maskCommand
+        up?.flags = .maskCommand
+        down?.post(tap: .cgAnnotatedSessionEventTap)
+        usleep(10_000)
+        up?.post(tap: .cgAnnotatedSessionEventTap)
+    }
+
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Required"
+        alert.informativeText = "ClipBoard needs Accessibility access to paste automatically.\n\nGo to System Settings → Privacy & Security → Accessibility and enable ClipBoard."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "OK")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+        }
     }
 
     // MARK: - Settings
@@ -982,6 +1039,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let i = sender.tag
         guard i < monitor.history.count else { return }
         monitor.copyToClipboard(monitor.history[i]); rebuildMenu()
+        waitForModifiersReleasedThenPaste()
     }
 
     @objc private func togglePinFromMenu(_ sender: NSMenuItem) {
