@@ -1,6 +1,6 @@
 # ClipBoard
 
-A lightweight macOS menu bar clipboard history manager. Single-file Swift app, no dependencies, under 200KB.
+A lightweight macOS menu bar clipboard history manager. Single-file Swift, no dependencies.
 
 ## Features
 
@@ -27,7 +27,7 @@ cp -r ClipBoard.app /Applications/
 Or build manually:
 
 ```bash
-swiftc main.swift -o ClipBoard.app/Contents/MacOS/ClipBoard -framework Cocoa -framework Carbon -O
+swiftc main.swift -o ClipBoard.app/Contents/MacOS/ClipBoard -framework Cocoa -framework Carbon -framework ServiceManagement -O
 open ClipBoard.app
 ```
 
@@ -50,7 +50,7 @@ ClipBoard requires **Accessibility** permission to simulate `Cmd+V` paste into t
 
 ### Menu bar dropdown
 
-Click the clipboard icon in the menu bar to see your history. Click any item to copy it back to the clipboard. Hover an item to reveal a submenu for pinning/unpinning.
+Click the clipboard icon in the menu bar to see your history. Click any item to copy and auto-paste it. Hover an item to reveal a submenu for pinning/unpinning.
 
 ### Quick paste popup
 
