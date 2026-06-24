@@ -570,26 +570,30 @@ class ShortcutRecorderButton: NSButton {
 
 // MARK: - Settings Window Controller
 
-class SettingsWindowController: NSWindowController {
+class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let settings = Settings.shared
     private var itemsStepper: NSStepper!
     private var itemsValueLabel: NSTextField!
     private var loginCheckbox: NSButton!
     private var popupCheckbox: NSButton!
     private var shortcutButton: ShortcutRecorderButton!
+    private var accessibilityStatusLabel: NSTextField!
+    private var accessibilityButton: NSButton!
+    private var permissionTimer: Timer?
 
     var onHotkeyChanged: (() -> Void)?
     var onMaxItemsChanged: (() -> Void)?
 
     init() {
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 340),
             styleMask: [.titled, .closable], backing: .buffered, defer: false
         )
         w.title = "ClipBoard Settings"
         w.isReleasedWhenClosed = false
         w.center()
         super.init(window: w)
+        w.delegate = self
         setupUI()
     }
 
@@ -723,6 +727,88 @@ class SettingsWindowController: NSWindowController {
         shortcutRow.addArrangedSubview(shortcutButton)
         shortcutRow.addArrangedSubview(hint)
         stack.addArrangedSubview(shortcutRow)
+
+        // -- Permissions section --
+        stack.addArrangedSubview(NSView()) // spacer
+        let permsHeader = makeSectionHeader("PERMISSIONS")
+        permsHeader.widthAnchor.constraint(equalToConstant: 320).isActive = true
+        stack.addArrangedSubview(permsHeader)
+
+        // Accessibility status + grant button
+        let axRow = NSStackView()
+        axRow.orientation = .horizontal; axRow.spacing = 8
+        let axLabel = makeLabel("Accessibility")
+        axLabel.widthAnchor.constraint(equalToConstant: 120).isActive = true
+
+        accessibilityStatusLabel = NSTextField(labelWithString: "")
+        accessibilityStatusLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        accessibilityStatusLabel.widthAnchor.constraint(equalToConstant: 110).isActive = true
+
+        accessibilityButton = NSButton(title: "Grant Access…", target: self, action: #selector(grantAccessibility))
+        accessibilityButton.bezelStyle = .rounded
+
+        axRow.addArrangedSubview(axLabel)
+        axRow.addArrangedSubview(accessibilityStatusLabel)
+        axRow.addArrangedSubview(accessibilityButton)
+        stack.addArrangedSubview(axRow)
+
+        // Hint explaining stale-permission case after rebuilds/updates
+        let axHint = NSTextField(wrappingLabelWithString:
+            "Required for auto-paste. If paste stops working after an update, remove ClipBoard from the Accessibility list, then click Grant Access again.")
+        axHint.font = .systemFont(ofSize: 10)
+        axHint.textColor = .tertiaryLabelColor
+        axHint.widthAnchor.constraint(equalToConstant: 320).isActive = true
+        stack.addArrangedSubview(axHint)
+
+        refreshPermissionStatus()
+    }
+
+    // MARK: - Permissions
+
+    private func refreshPermissionStatus() {
+        let trusted = AXIsProcessTrusted()
+        if trusted {
+            accessibilityStatusLabel.stringValue = "● Granted"
+            accessibilityStatusLabel.textColor = .systemGreen
+            accessibilityButton.title = "Re-check"
+        } else {
+            accessibilityStatusLabel.stringValue = "● Not granted"
+            accessibilityStatusLabel.textColor = .systemRed
+            accessibilityButton.title = "Grant Access…"
+        }
+    }
+
+    @objc private func grantAccessibility() {
+        if !AXIsProcessTrusted() {
+            // Prompt adds ClipBoard to the Accessibility list, then jump to the pane.
+            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(opts)
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        refreshPermissionStatus()
+    }
+
+    private func startPermissionTimer() {
+        stopPermissionTimer()
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            self?.refreshPermissionStatus()
+        }
+    }
+
+    private func stopPermissionTimer() {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        refreshPermissionStatus()
+        startPermissionTimer()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        stopPermissionTimer()
     }
 
     @objc private func stepperChanged() {
